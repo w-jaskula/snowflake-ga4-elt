@@ -142,6 +142,7 @@ database = "ANALYTICS_PROD"
 schema = "GOOGLE_ANALYTICS"
 client_session_keep_alive = true
 ```
+Snowflake account identifier must use the format `organization-account`. You can extract these two values directly from your Snowsight URL: `https://snowflake.com`.
 
 ### 4. Run the Application
 Launch the local instance of the dashboard:
