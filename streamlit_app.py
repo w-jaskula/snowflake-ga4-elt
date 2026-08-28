@@ -1,27 +1,23 @@
-# ==========================================
-# 1. IMPORTS
-# ==========================================
 import streamlit as st
-import os
+from connection import get_connection
+from connection import load_data
+
+session = get_connection()
+data = load_data(session)
+
+df_device = data["device"]
+df_geo = data["geo"]
+df_daily = data["daily"]
+df_kpis = data["kpis"]
 
 # ==========================================
-# 2. DATABASE CONNECTION & DATA FETCHING
+# HEADER & CONTEXT
 # ==========================================
-conn = st.connection("snowflake", ttl=os.getenv("SNOWFLAKE_CONNECTION_TTL"))
-session = conn.session()
 
-df_device = session.sql("SELECT * FROM ANALYTICS_PROD.GOOGLE_ANALYTICS.DEVICE_ENGAGEMENT").to_pandas()
-df_geo = session.sql("SELECT * FROM ANALYTICS_PROD.GOOGLE_ANALYTICS.GEO_PERFORMANCE").to_pandas()
-df_daily = session.sql("SELECT * FROM ANALYTICS_PROD.GOOGLE_ANALYTICS.DAILY_EVENT_SUMMARY").to_pandas()
-df_kpis = session.sql("SELECT * FROM ANALYTICS_PROD.GOOGLE_ANALYTICS.OVERALL_KPI_SUMMARY").to_pandas()
-
-# ==========================================
-# 3. HEADER & CONTEXT
-# ==========================================
 st.title(f"GA4 E-Commerce & User Engagement Overview")
 st.write(
-  """This dashboard presents aggregated product and geographical analytics powered by data from the gold layer in Snowflake. It enables clear tracking of user engagement, key market performance, and event dynamics over time.
-  """
+    """This dashboard presents aggregated product and geographical analytics powered by data from the gold layer in Snowflake. It enables clear tracking of user engagement, key market performance, and event dynamics over time.
+    """
 )
 
 st.markdown("""
@@ -32,7 +28,7 @@ st.markdown("""
 st.divider()
 
 # ==========================================
-# 4. KPI CARDS
+# KPI CARDS
 # ==========================================
 total_events = df_kpis["TOTAL_EVENTS"].iloc[0]
 unique_users = df_kpis["UNIQUE_USERS"].iloc[0]
@@ -52,25 +48,25 @@ with col3:
         st.metric(label="Average engagement [sec]", value=f"{avg_engagement:,}")
 
 # ==========================================
-# 5. TABS & VISUALIZATIONS
+# TABS & VISUALIZATIONS
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📱 Device & OS Engagement", "🌍 Geographical Performance", "📈 Daily Event Dynamics"])
 
 # ------------------------------------------
-# 5.1 TAB DEVICE & OS ENGAGEMENT
+# 1. TAB DEVICE & OS ENGAGEMENT
 # ------------------------------------------
 with tab1:
     st.subheader("Device & OS Engagement Breakdown")
-    
+
     col1, col2 = st.columns([1.2, 1])
 
     with col1:
         st.markdown("**Total Events by Operating System**")
         df_os_pivot = df_device.pivot_table(
-            index="OPERATING_SYSTEM", 
-            columns="DEVICE_CATEGORY", 
-            values="TOTAL_EVENTS", 
-            aggfunc="sum", 
+            index="OPERATING_SYSTEM",
+            columns="DEVICE_CATEGORY",
+            values="TOTAL_EVENTS",
+            aggfunc="sum",
             fill_value=0
         )
 
@@ -82,21 +78,21 @@ with tab1:
     with col2:
         st.markdown("**Avg Engagement Time by Browser**")
         df_browser_clean = df_device[
-            (df_device["AVG_ENGAGEMENT_SECONDS"].notna()) & 
+            (df_device["AVG_ENGAGEMENT_SECONDS"].notna()) &
             (df_device["BROWSER"] != "<Other>")
-        ]
+            ]
 
         df_browser_eng = (
             df_browser_clean
             .groupby("BROWSER", as_index=False)["AVG_ENGAGEMENT_SECONDS"]
             .mean()
-            .sort_values(by="AVG_ENGAGEMENT_SECONDS", ascending=True) 
+            .sort_values(by="AVG_ENGAGEMENT_SECONDS", ascending=True)
         )
 
         st.bar_chart(
-            df_browser_eng, 
-            x="BROWSER", 
-            y="AVG_ENGAGEMENT_SECONDS", 
+            df_browser_eng,
+            x="BROWSER",
+            y="AVG_ENGAGEMENT_SECONDS",
             horizontal=True
         )
 
@@ -104,14 +100,14 @@ with tab1:
         st.dataframe(df_device, use_container_width=True)
 
 # ------------------------------------------
-# 5.2 TAB GEOGRAPHICAL PERFORMANCE
+# 2. TAB GEOGRAPHICAL PERFORMANCE
 # ------------------------------------------
 with tab2:
     st.subheader("Geographical Performance")
 
     df_geo_pivoted = df_geo.pivot(
-        index="COUNTRY", 
-        columns="CITY", 
+        index="COUNTRY",
+        columns="CITY",
         values="UNIQUE_USERS"
     ).fillna(0)
 
@@ -136,7 +132,7 @@ with tab2:
         st.dataframe(df_geo, use_container_width=True, hide_index=True)
 
 # ------------------------------------------
-# 5.3 TAB DAILY EVENT DYNAMICS
+# 3. TAB DAILY EVENT DYNAMICS
 # ------------------------------------------
 with tab3:
     st.subheader("Available events by date")
@@ -147,24 +143,24 @@ with tab3:
     )
     df_daily_filtered = df_daily[df_daily["EVENT_NAME"] == selected_event]
     st.line_chart(
-        df_daily_filtered, 
-        x="EVENT_DATE", 
+        df_daily_filtered,
+        x="EVENT_DATE",
         y="TOTAL_EVENTS"
     )
-    
+
     st.subheader("Unique users per event")
     df_daily_grouped = (
-    df_daily
-    .groupby("EVENT_NAME", as_index=False)["UNIQUE_USERS"]
-    .sum()
-    .sort_values(by="EVENT_NAME", ascending=True)
-)
+        df_daily
+        .groupby("EVENT_NAME", as_index=False)["UNIQUE_USERS"]
+        .sum()
+        .sort_values(by="EVENT_NAME", ascending=True)
+    )
 
     st.bar_chart(
         df_daily_grouped,
         x="EVENT_NAME",
         y="UNIQUE_USERS"
-)
+    )
 
     with st.expander("📄 Show raw data table"):
         st.dataframe(df_daily, use_container_width=True)
